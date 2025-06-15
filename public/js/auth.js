@@ -44,71 +44,37 @@ function openAuthPopup() {
 // Проверка статуса popup окна
 function checkPopupStatus() {
   if (authPopup && authPopup.closed) {
-    // Popup закрыто пользователем
     clearInterval(checkInterval);
     resetAuthButton();
-    console.log('🔒 Popup закрыто пользователем');
+    window.removeEventListener('message', handlePopupMessage);
   }
 }
 
-// Обработка сообщений от popup
+// Обработчик сообщений от popup окна
 function handlePopupMessage(event) {
-  // Проверяем источник сообщения (безопасность)
+  // Проверяем источник сообщения
   if (event.origin !== window.location.origin) {
+    console.warn('⚠️ Получено сообщение с неизвестного источника:', event.origin);
     return;
   }
   
   const data = event.data;
   
-  if (data.type === 'senler-auth-success') {
-    console.log('✅ Получены данные авторизации от popup');
-    
-    // Закрываем popup
-    if (authPopup) {
-      authPopup.close();
-    }
-    
-    // Останавливаем проверку
-    clearInterval(checkInterval);
-    
-    // Сохраняем данные в localStorage
-    console.log('💾 Сохраняем данные в localStorage');
-    
-    // Используем функцию из main.js
-    if (window.saveAuthData) {
-      window.saveAuthData(data.accessToken, data.groupId);
-      
-      // Обновляем кнопку
-      const authButton = document.getElementById('authButton');
-      if (authButton) {
-        authButton.textContent = '✅ Авторизован! Обновляем...';
-      }
-      
-      // Обновляем страницу
-      setTimeout(() => {
-        console.log('🔄 Обновляем страницу');
-        window.location.reload();
-      }, 1000);
-    } else {
-      console.error('❌ Функция saveAuthData не найдена');
-      alert('Ошибка: не удается сохранить данные авторизации');
-      resetAuthButton();
-    }
-    
-  } else if (data.type === 'senler-auth-error') {
-    console.error('❌ Ошибка авторизации в popup:', data.error);
-    
-    // Закрываем popup
-    if (authPopup) {
-      authPopup.close();
-    }
-    
-    // Останавливаем проверку
-    clearInterval(checkInterval);
-    
-    // Показываем ошибку
-    alert('Ошибка авторизации: ' + (data.error || 'Неизвестная ошибка'));
-    resetAuthButton();
+  // Проверяем наличие данных
+  if (!data || !data.accessToken || !data.groupId) {
+    console.error('❌ Получены некорректные данные от popup');
+    return;
+  }
+  
+  // Сохраняем данные в localStorage
+  localStorage.setItem('senler_access_token', data.accessToken);
+  localStorage.setItem('senler_group_id', data.groupId);
+  localStorage.setItem('senler_auth_time', Date.now().toString());
+  
+  // Закрываем popup и обновляем страницу
+  if (authPopup) {
+    authPopup.close();
+    window.location.reload();
   }
 }
 

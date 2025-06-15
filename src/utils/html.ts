@@ -20,17 +20,20 @@ export const generateHTML = (title: string, content: string): string => {
 </html>`;
 };
 
+interface PopupSuccessData {
+  accessToken: string;
+  groupId: string;
+}
+
 /**
  * Генерация страницы успешной авторизации в popup
  */
-export const generatePopupSuccessHTML = (accessToken: string, groupId: string): string => {
+export const generatePopupSuccessHTML = (data: PopupSuccessData): string => {
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="access-token" content="${accessToken}">
-  <meta name="group-id" content="${groupId}">
   <title>Авторизация успешна</title>
   <link rel="stylesheet" href="/css/popup.css">
 </head>
@@ -45,7 +48,13 @@ export const generatePopupSuccessHTML = (accessToken: string, groupId: string): 
       </div>
     </div>
   </div>
-  <script src="/js/popup-success.js"></script>
+  <script>
+    // Отправляем данные в родительское окно
+    window.opener.postMessage({
+      accessToken: "${data.accessToken}",
+      groupId: "${data.groupId}"
+    }, window.location.origin);
+  </script>
 </body>
 </html>`;
 };

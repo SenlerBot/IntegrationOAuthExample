@@ -14,6 +14,7 @@ export const configurePassport = (PORT: number): void => {
       authorizationURL: process.env.SENLER_AUTHORIZATION_URL || '',
       tokenURL: process.env.SENLER_TOKEN_URL || '',
     }, (accessToken: string, refreshToken: string, profile: any, done: any) => {
+      // Библиотека сама обрабатывает group_id и передает его в результате
       return done(null, { accessToken, refreshToken, profile });
     }) as any
   );

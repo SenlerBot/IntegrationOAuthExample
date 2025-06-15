@@ -11,15 +11,13 @@ const router = Router();
  */
 router.get('/senler', (req: Request, res: Response, next: NextFunction): void => {
   const groupIdFromUrl = req.query.group_id as string;
+  console.log('🔍 /auth/senler - group_id из URL:', groupIdFromUrl);
+  console.log('🔍 /auth/senler - req.query:', req.query);
   
-  if (groupIdFromUrl) {
-    // Передаем group_id через state параметр
-    passport.authenticate('senler', {
-      state: JSON.stringify({ groupId: groupIdFromUrl })
-    })(req, res, next);
-  } else {
-    passport.authenticate('senler')(req, res, next);
-  }
+  // Передаем group_id через опции для authorizationParams
+  passport.authenticate('senler', {
+    group_id: groupIdFromUrl
+  } as any)(req, res, next);
 });
 
 /**
@@ -51,13 +49,13 @@ router.get(
           req.query.error as string,
           req.query.error_description as string
         );
-                 res.send(errorHtml);
-         return;
-       } else {
-         // Для обычной авторизации редирект
+        res.send(errorHtml);
+        return;
+      } else {
+        // Для обычной авторизации редирект
         res.redirect(`/?error=senler_error&details=${encodeURIComponent(req.query.error as string)}&description=${encodeURIComponent(req.query.error_description as string || 'Неизвестная ошибка')}`);
         return;
-       }
+      }
     }
     
     next();
@@ -71,60 +69,54 @@ router.get(
     const accessToken = user?.accessToken;
     let groupId = user?.groupId;
     
-    // Проверяем, это popup авторизация или обычная, и получаем group_id из state
+    // Проверяем, это popup авторизация или обычная
     const state = req.query.state as string;
     let isPopup = false;
-    let groupIdFromState: string | undefined;
     
     try {
       if (state) {
         const stateData = JSON.parse(state);
         isPopup = stateData.popup === true;
-        groupIdFromState = stateData.groupId;
       }
     } catch (e) {
       // Игнорируем ошибку парсинга state
     }
     
-    // Используем group_id из state с приоритетом над тем, что пришло от Senler
-    if (groupIdFromState) {
-      groupId = groupIdFromState;
-      console.log(`📌 Используем group_id из URL: ${groupId}`);
-    }
-    
     if (!accessToken) {
       console.error('❌ Токен доступа не найден');
       
-             if (isPopup) {
-         const errorHtml = generatePopupErrorHTML('no_token');
-         res.send(errorHtml);
-         return;
-       } else {
+      if (isPopup) {
+        const errorHtml = generatePopupErrorHTML('no_token');
+        res.send(errorHtml);
+        return;
+      } else {
         res.redirect('/?error=no_token');
         return;
-       }
+      }
     }
     
     if (!groupId) {
       console.error('❌ Group ID не найден');
       
-             if (isPopup) {
-         const errorHtml = generatePopupErrorHTML('no_group_id');
-         res.send(errorHtml);
-         return;
-       } else {
+      if (isPopup) {
+        const errorHtml = generatePopupErrorHTML('no_group_id');
+        res.send(errorHtml);
+        return;
+      } else {
         res.redirect('/?error=no_group_id');
         return;
-       }
+      }
     }
     
     if (isPopup) {
-      // Для popup возвращаем HTML страницу с JavaScript
-      const successHtml = generatePopupSuccessHTML(accessToken, groupId);
+      // Для popup возвращаем HTML с данными
+      const successHtml = generatePopupSuccessHTML({
+        accessToken,
+        groupId,
+      });
       res.send(successHtml);
     } else {
-      // Для обычной авторизации сохраняем в сессии и редирект
-      req.session.user = user;
+      // Для обычной авторизации редирект на главную
       res.redirect('/');
     }
   }
@@ -143,19 +135,17 @@ router.get('/senler/error', (req: Request, res: Response): void => {
  */
 router.get('/senler/popup', (req: Request, res: Response, next: NextFunction): void => {
   const groupIdFromUrl = req.query.group_id as string;
+  console.log('🔍 /auth/senler/popup - group_id из URL:', groupIdFromUrl);
+  console.log('🔍 /auth/senler/popup - req.query:', req.query);
   
-  // Добавляем параметр для определения popup авторизации и передаем group_id если есть
-  const stateData: any = { popup: true };
-  if (groupIdFromUrl) {
-    stateData.groupId = groupIdFromUrl;
-  }
+  // Передаем параметр для определения popup авторизации и group_id через опции
+  const stateData = { popup: true };
   
   passport.authenticate('senler', {
-    state: JSON.stringify(stateData)
-  })(req, res, next);
+    state: JSON.stringify(stateData),
+    group_id: groupIdFromUrl
+  } as any)(req, res, next);
 });
-
-
 
 /**
  * Endpoint для валидации данных авторизации (localStorage используется на клиенте)
@@ -213,7 +203,5 @@ router.post('/subscribers', async (req: Request, res: Response): Promise<void> =
     });
   }
 });
-
-
 
 export default router; 
