@@ -1,0 +1,160 @@
+/* Сброс стилей */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Основные стили */
+body {
+  font-family: Arial, sans-serif;
+  background: #fff;
+  padding: 20px;
+  color: #333;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #428BCA;
+  margin-bottom: 20px;
+}
+
+/* Кнопки */
+.btn {
+  background: #428BCA;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  text-decoration: none;
+  display: inline-block;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.btn:hover {
+  background: #357ebd;
+}
+
+.btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Статистика */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.stat {
+  background: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.stat-number {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #428BCA;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+/* Таблицы */
+.table {
+  background: #f5f5f5;
+  border-radius: 4px;
+  margin-top: 20px;
+}
+
+.table-header {
+  background: #428BCA;
+  color: #fff;
+  padding: 8px;
+  font-weight: bold;
+}
+
+.table-row {
+  padding: 5px 8px;
+  border-bottom: 1px solid #ddd;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 5px;
+}
+
+/* Сообщения об ошибках */
+.error {
+  color: #d63384;
+  background: #f8d7da;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 10px 0;
+  border: 1px solid #f5c6cb;
+}
+
+/* Индикатор загрузки */
+.loading {
+  color: #428BCA;
+  margin: 20px 0;
+}
+
+/* Отладочная информация */
+.debug-info {
+  margin-top: 20px;
+  font-size: 0.9rem;
+  color: #666;
+  text-align: left;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+  border-left: 4px solid #428BCA;
+}
+
+/* Информационные блоки */
+.info-block {
+  margin-top: 20px;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  text-align: left;
+}
+
+/* Успешные сообщения */
+.success {
+  color: #155724;
+  background: #d4edda;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 10px 0;
+  border: 1px solid #c3e6cb;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+  }
+  
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  }
+  
+  .table-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+    text-align: center;
+  }
+} 
