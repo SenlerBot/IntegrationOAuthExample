@@ -15,6 +15,7 @@
     "setup": "node scripts/setup.js",
     "update-libs": "node scripts/update-libraries.js",
     "test-ui": "node scripts/test-ui.js",
+    "test-group-id": "node scripts/test-group-id.js",
     "postinstall": "echo '\n✅ Зависимости установлены! Выполните: cp env.example .env && заполните переменные окружения'"
   },
   "keywords": [
