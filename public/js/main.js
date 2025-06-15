@@ -14,9 +14,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Проверка статуса авторизации
 function checkAuthStatus() {
-  const accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-  const groupId = localStorage.getItem(STORAGE_KEYS.GROUP_ID);
+  let accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  let groupId = localStorage.getItem(STORAGE_KEYS.GROUP_ID);
   const authTime = localStorage.getItem(STORAGE_KEYS.AUTH_TIME);
+  
+  // Проверяем, есть ли group_id в URL (приоритет над localStorage)
+  const urlGroupIdMeta = document.querySelector('meta[name="url-group-id"]');
+  const groupIdFromUrl = urlGroupIdMeta ? urlGroupIdMeta.getAttribute('content') : null;
+  
+  if (groupIdFromUrl && accessToken && groupIdFromUrl !== groupId) {
+    // Если group_id из URL отличается от сохраненного, обновляем
+    console.log('📌 Обновляем group_id из URL:', groupIdFromUrl);
+    localStorage.setItem(STORAGE_KEYS.GROUP_ID, groupIdFromUrl);
+    groupId = groupIdFromUrl;
+  }
   
   document.getElementById('loading').style.display = 'none';
   

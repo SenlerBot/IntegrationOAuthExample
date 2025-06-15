@@ -10,16 +10,17 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   const error = req.query.error as string;
   const errorDetails = req.query.details as string;
   const errorDescription = req.query.description as string;
+  const groupIdFromUrl = req.query.group_id as string;
 
   // Показываем единую страницу с клиентской логикой
-  const content = generateMainPage(error, errorDetails, errorDescription);
+  const content = generateMainPage(error, errorDetails, errorDescription, groupIdFromUrl);
   res.send(generateHTML('Senler Dashboard', content));
 });
 
 /**
  * Генерация контента главной страницы с поддержкой localStorage
  */
-function generateMainPage(error?: string, errorDetails?: string, errorDescription?: string): string {
+function generateMainPage(error?: string, errorDetails?: string, errorDescription?: string, groupIdFromUrl?: string): string {
   let errorHtml = '';
   
   if (error) {
@@ -79,7 +80,10 @@ function generateMainPage(error?: string, errorDetails?: string, errorDescriptio
     `;
   }
   
-  return `
+      return `
+    <!-- Данные из URL -->
+    ${groupIdFromUrl ? `<meta name="url-group-id" content="${groupIdFromUrl}">` : ''}
+    
     <!-- Секция неавторизованного пользователя -->
     <div id="unauthenticated" style="display: none;">
       <p style="margin-bottom: 20px;">Для доступа к статистике необходимо авторизоваться через Senler</p>
@@ -91,6 +95,7 @@ function generateMainPage(error?: string, errorDetails?: string, errorDescriptio
         • Client Secret: ${process.env.SENLER_CLIENT_SECRET ? '✅ Настроен' : '❌ Не настроен'}<br>
         • Callback URL: ${process.env.SENLER_CALLBACK_URL || `http://localhost:${process.env.PORT || 3000}/auth/senler/callback`}<br>
         • Хранение: localStorage (работает в iframe)
+        ${groupIdFromUrl ? `<br>• Group ID из URL: ${groupIdFromUrl}` : ''}
       </div>
     </div>
 

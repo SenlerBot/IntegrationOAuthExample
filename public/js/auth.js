@@ -16,9 +16,20 @@ function openAuthPopup() {
   const left = (screen.width - width) / 2;
   const top = (screen.height - height) / 2;
   
+  // Получаем group_id из meta тега если есть
+  const urlGroupIdMeta = document.querySelector('meta[name="url-group-id"]');
+  const groupIdFromUrl = urlGroupIdMeta ? urlGroupIdMeta.getAttribute('content') : null;
+  
+  // Формируем URL с параметрами
+  let popupUrl = '/auth/senler/popup';
+  if (groupIdFromUrl) {
+    popupUrl += '?group_id=' + encodeURIComponent(groupIdFromUrl);
+    console.log('📌 Передаем group_id в popup:', groupIdFromUrl);
+  }
+  
   // Открываем popup
   authPopup = window.open(
-    '/auth/senler/popup',
+    popupUrl,
     'senler-auth',
     'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top + ',scrollbars=yes,resizable=yes'
   );

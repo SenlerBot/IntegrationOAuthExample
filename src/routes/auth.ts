@@ -10,7 +10,16 @@ const router = Router();
  * Начало процесса аутентификации через Senler (обычный редирект)
  */
 router.get('/senler', (req: Request, res: Response, next: NextFunction): void => {
-  passport.authenticate('senler')(req, res, next);
+  const groupIdFromUrl = req.query.group_id as string;
+  
+  if (groupIdFromUrl) {
+    // Передаем group_id через state параметр
+    passport.authenticate('senler', {
+      state: JSON.stringify({ groupId: groupIdFromUrl })
+    })(req, res, next);
+  } else {
+    passport.authenticate('senler')(req, res, next);
+  }
 });
 
 /**
@@ -62,17 +71,25 @@ router.get(
     const accessToken = user?.accessToken;
     let groupId = user?.groupId;
     
-    // Проверяем, это popup авторизация или обычная
+    // Проверяем, это popup авторизация или обычная, и получаем group_id из state
     const state = req.query.state as string;
     let isPopup = false;
+    let groupIdFromState: string | undefined;
     
     try {
       if (state) {
         const stateData = JSON.parse(state);
         isPopup = stateData.popup === true;
+        groupIdFromState = stateData.groupId;
       }
     } catch (e) {
       // Игнорируем ошибку парсинга state
+    }
+    
+    // Используем group_id из state с приоритетом над тем, что пришло от Senler
+    if (groupIdFromState) {
+      groupId = groupIdFromState;
+      console.log(`📌 Используем group_id из URL: ${groupId}`);
     }
     
     if (!accessToken) {
@@ -125,9 +142,16 @@ router.get('/senler/error', (req: Request, res: Response): void => {
  * Начало процесса аутентификации через Senler в popup
  */
 router.get('/senler/popup', (req: Request, res: Response, next: NextFunction): void => {
-  // Добавляем параметр для определения popup авторизации
+  const groupIdFromUrl = req.query.group_id as string;
+  
+  // Добавляем параметр для определения popup авторизации и передаем group_id если есть
+  const stateData: any = { popup: true };
+  if (groupIdFromUrl) {
+    stateData.groupId = groupIdFromUrl;
+  }
+  
   passport.authenticate('senler', {
-    state: JSON.stringify({ popup: true })
+    state: JSON.stringify(stateData)
   })(req, res, next);
 });
 
