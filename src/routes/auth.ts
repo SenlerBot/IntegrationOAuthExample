@@ -13,104 +13,14 @@ router.get('/senler', (req: Request, res: Response, next: NextFunction): void =>
   const groupIdFromUrl = req.query.group_id as string;
   
   if (groupIdFromUrl) {
-    // Строим OAuth URL с group_id параметром напрямую
-    const clientId = process.env.SENLER_CLIENT_ID;
-    const redirectUri = encodeURIComponent(process.env.SENLER_CALLBACK_URL || `http://localhost:${process.env.PORT || 3000}/auth/senler/callback`);
-    const state = generateRandomState();
-    
-    // Сохраняем состояние для валидации в callback
-    (req as any).session.oauthState = state;
-    (req as any).session.tempGroupId = groupIdFromUrl;
-    
-    const oauthUrl = `https://senler.ru/cabinet/OAuth2authorize?response_type=code&group_id=${groupIdFromUrl}&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}`;
-    
-    console.log(`📌 Редирект на OAuth с group_id: ${groupIdFromUrl}`);
-    res.redirect(oauthUrl);
-    return;
+    // Передаем group_id через state параметр
+    passport.authenticate('senler', {
+      state: JSON.stringify({ groupId: groupIdFromUrl })
+    })(req, res, next);
+  } else {
+    passport.authenticate('senler')(req, res, next);
   }
-  
-  passport.authenticate('senler')(req, res, next);
 });
-
-/**
- * Генерация случайного state для OAuth
- */
-function generateRandomState(): string {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
-
-/**
- * Обработка прямого OAuth callback (с group_id параметром)
- */
-async function handleDirectOAuthCallback(req: Request, res: Response): Promise<void> {
-  const authCode = req.query.code as string;
-  const sessionGroupId = (req as any).session?.tempGroupId;
-  const sessionIsPopup = (req as any).session?.isPopup || false;
-  
-  try {
-    // Получаем токен от Senler API
-    const tokenResponse = await fetch('https://senler.ru/api/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        client_id: process.env.SENLER_CLIENT_ID,
-        client_secret: process.env.SENLER_CLIENT_SECRET,
-        code: authCode,
-        redirect_uri: process.env.SENLER_CALLBACK_URL || `http://localhost:${process.env.PORT || 3000}/auth/senler/callback`
-      })
-    });
-    
-    if (!tokenResponse.ok) {
-      throw new Error(`HTTP ${tokenResponse.status}: ${tokenResponse.statusText}`);
-    }
-    
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-    
-    if (!accessToken) {
-      throw new Error('Не удалось получить access token');
-    }
-    
-    console.log(`✅ Получен токен через прямой OAuth для group_id: ${sessionGroupId}`);
-    
-    // Очищаем временные данные из сессии
-    delete (req as any).session.tempGroupId;
-    delete (req as any).session.oauthState;
-    delete (req as any).session.isPopup;
-    
-    if (sessionIsPopup) {
-      // Для popup возвращаем HTML страницу с JavaScript
-      const successHtml = generatePopupSuccessHTML(accessToken, sessionGroupId);
-      res.send(successHtml);
-    } else {
-      // Для обычной авторизации сохраняем в сессии и редирект
-      (req as any).session.user = {
-        accessToken,
-        groupId: sessionGroupId,
-        profile: {}
-      };
-      res.redirect('/');
-    }
-    
-  } catch (error: any) {
-    console.error('❌ Ошибка прямого OAuth:', error.message);
-    
-    // Очищаем сессию при ошибке
-    delete (req as any).session.tempGroupId;
-    delete (req as any).session.oauthState;
-    delete (req as any).session.isPopup;
-    
-    if (sessionIsPopup) {
-      const errorHtml = generatePopupErrorHTML('oauth_token_error', error.message);
-      res.send(errorHtml);
-    } else {
-      res.redirect(`/?error=oauth_token_error&details=${encodeURIComponent(error.message)}`);
-    }
-  }
-}
 
 /**
  * Обработчик обратного вызова для Senler (обычный и popup)
@@ -118,18 +28,6 @@ async function handleDirectOAuthCallback(req: Request, res: Response): Promise<v
 router.get(
   '/senler/callback',
   (req: Request, res: Response, next: NextFunction): void => {
-    // Проверяем, есть ли у нас прямой OAuth callback (с group_id)
-    const sessionGroupId = (req as any).session?.tempGroupId;
-    const sessionState = (req as any).session?.oauthState;
-    const callbackState = req.query.state as string;
-    const authCode = req.query.code as string;
-    
-    if (sessionGroupId && sessionState && sessionState === callbackState && authCode) {
-      // Обрабатываем прямой OAuth callback
-      handleDirectOAuthCallback(req, res);
-      return;
-    }
-    
     // Проверяем наличие ошибки в callback
     if (req.query.error) {
       console.error('❌ Ошибка callback:', req.query.error);
@@ -173,38 +71,25 @@ router.get(
     const accessToken = user?.accessToken;
     let groupId = user?.groupId;
     
-    // Проверяем сессию для прямого OAuth с group_id
-    const sessionGroupId = (req as any).session?.tempGroupId;
-    const sessionState = (req as any).session?.oauthState;
-    const sessionIsPopup = (req as any).session?.isPopup;
-    const callbackState = req.query.state as string;
-    
+    // Проверяем, это popup авторизация или обычная, и получаем group_id из state
+    const state = req.query.state as string;
     let isPopup = false;
+    let groupIdFromState: string | undefined;
     
-    // Если есть данные в сессии (прямой OAuth), используем их
-    if (sessionGroupId && sessionState && sessionState === callbackState) {
-      groupId = sessionGroupId;
-      isPopup = sessionIsPopup || false;
-      console.log(`📌 Используем group_id из прямого OAuth: ${groupId}`);
-      
-      // Очищаем временные данные из сессии
-      delete (req as any).session.tempGroupId;
-      delete (req as any).session.oauthState;
-      delete (req as any).session.isPopup;
-    } else {
-      // Fallback на старую логику с state параметром
-      try {
-        if (callbackState) {
-          const stateData = JSON.parse(callbackState);
-          isPopup = stateData.popup === true;
-          if (stateData.groupId) {
-            groupId = stateData.groupId;
-            console.log(`📌 Используем group_id из state: ${groupId}`);
-          }
-        }
-      } catch (e) {
-        // Игнорируем ошибку парсинга state
+    try {
+      if (state) {
+        const stateData = JSON.parse(state);
+        isPopup = stateData.popup === true;
+        groupIdFromState = stateData.groupId;
       }
+    } catch (e) {
+      // Игнорируем ошибку парсинга state
+    }
+    
+    // Используем group_id из state с приоритетом над тем, что пришло от Senler
+    if (groupIdFromState) {
+      groupId = groupIdFromState;
+      console.log(`📌 Используем group_id из URL: ${groupId}`);
     }
     
     if (!accessToken) {
@@ -259,27 +144,14 @@ router.get('/senler/error', (req: Request, res: Response): void => {
 router.get('/senler/popup', (req: Request, res: Response, next: NextFunction): void => {
   const groupIdFromUrl = req.query.group_id as string;
   
+  // Добавляем параметр для определения popup авторизации и передаем group_id если есть
+  const stateData: any = { popup: true };
   if (groupIdFromUrl) {
-    // Строим OAuth URL с group_id параметром для popup
-    const clientId = process.env.SENLER_CLIENT_ID;
-    const redirectUri = encodeURIComponent(process.env.SENLER_CALLBACK_URL || `http://localhost:${process.env.PORT || 3000}/auth/senler/callback`);
-    const state = generateRandomState();
-    
-    // Сохраняем состояние для валидации в callback и помечаем как popup
-    (req as any).session.oauthState = state;
-    (req as any).session.tempGroupId = groupIdFromUrl;
-    (req as any).session.isPopup = true;
-    
-    const oauthUrl = `https://senler.ru/cabinet/OAuth2authorize?response_type=code&group_id=${groupIdFromUrl}&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}`;
-    
-    console.log(`📌 Popup редирект на OAuth с group_id: ${groupIdFromUrl}`);
-    res.redirect(oauthUrl);
-    return;
+    stateData.groupId = groupIdFromUrl;
   }
   
-  // Обычный popup без group_id через passport
   passport.authenticate('senler', {
-    state: JSON.stringify({ popup: true })
+    state: JSON.stringify(stateData)
   })(req, res, next);
 });
 

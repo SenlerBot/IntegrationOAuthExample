@@ -3,7 +3,7 @@ import { SenlerStrategy } from 'passport-senler';
 
 /**
  * Настройка Passport стратегии для Senler
- * Используем динамическую стратегию для поддержки group_id параметра
+ * Используем одну стратегию для обычной и popup авторизации
  */
 export const configurePassport = (PORT: number): void => {
   passport.use(

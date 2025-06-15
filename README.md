@@ -63,14 +63,6 @@ OAuth redirect → callback → popup с данными → localStorage → г�
 ```javascript
 // URL с group_id
 http://localhost:3000?group_id=53178 → автоматически используется в OAuth
-
-// OAuth URL будет:
-https://senler.ru/cabinet/OAuth2authorize?
-  response_type=code&
-  group_id=53178&
-  client_id=YOUR_CLIENT_ID&
-  redirect_uri=...&
-  state=random_state
 ```
 
 ### Хранение данных
