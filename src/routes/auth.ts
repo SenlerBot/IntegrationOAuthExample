@@ -7,168 +7,185 @@ import { createSenlerService } from '../services/senler';
 const router = Router();
 
 /**
- * Начало процесса аутентификации через Senler (обычный редирект)
+ * Check if the current request is using popup authorization mode
+ * @param req - Express request object
+ * @returns True if popup authorization is being used, false otherwise
+ */
+const isPopupAuth = (req: Request): boolean => {
+  const state = req.query.state as string;
+  if (!state) return false;
+  
+  try {
+    const stateData = JSON.parse(state);
+    return stateData.popup === true;
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * Extract group_id from OAuth state parameter
+ * @param req - Express request object
+ * @returns Group ID from state parameter or null if not found
+ */
+const getGroupIdFromState = (req: Request): string | null => {
+  const state = req.query.state as string;
+  if (!state) return null;
+  
+  try {
+    const stateData = JSON.parse(state);
+    return stateData.groupId || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * Handle authentication errors for both popup and redirect modes
+ * @param res - Express response object
+ * @param error - Error code or type
+ * @param description - Optional detailed error description
+ * @param isPopup - Whether to handle error in popup mode (default: false)
+ */
+const handleAuthError = (res: Response, error: string, description?: string, isPopup: boolean = false): void => {
+  if (isPopup) {
+    const errorHtml = generatePopupErrorHTML(error, description);
+    res.send(errorHtml);
+  } else {
+    const params = new URLSearchParams({
+      error: 'auth_failed',
+      details: error,
+      ...(description && { description })
+    });
+    res.redirect(`/?${params.toString()}`);
+  }
+};
+
+/**
+ * Универсальный роут для начала OAuth авторизации
+ * Режим определяется переменной окружения AUTH_MODE
+ * 
+ * Использование:
+ * - Popup: AUTH_MODE=popup (рекомендуется, работает в iframe)
+ * - Redirect: AUTH_MODE=redirect (НЕ работает в iframe, будет поддержано позже)
+ * - Принудительный режим: GET /auth/senler?mode=popup или ?mode=redirect
  */
 router.get('/senler', (req: Request, res: Response, next: NextFunction): void => {
   const groupIdFromUrl = req.query.group_id as string;
-  console.log('🔍 /auth/senler - group_id из URL:', groupIdFromUrl);
-  console.log('🔍 /auth/senler - req.query:', req.query);
+  const forcedMode = req.query.mode as string;
   
-  // Передаем group_id через опции для authorizationParams
-  passport.authenticate('senler', {
-    group_id: groupIdFromUrl
-  } as any)(req, res, next);
+  // Определяем режим авторизации
+  let authMode = forcedMode || process.env.AUTH_MODE || 'popup';
+  
+  // Проверяем поддержку режима
+  if (authMode === 'redirect') {
+    console.warn('⚠️ Redirect режим не поддерживается в iframe интеграции. Используйте popup режим.');
+  }
+  
+  const isPopup = authMode === 'popup';
+  const isRedirect = authMode === 'redirect';
+  
+  console.log('🔍 OAuth авторизация:', { 
+    groupId: groupIdFromUrl, 
+    mode: authMode,
+    popup: isPopup, 
+    redirect: isRedirect,
+    groupIdProvided: !!groupIdFromUrl
+  });
+  
+  // Формируем опции для Passport
+  const authOptions: any = { group_id: groupIdFromUrl };
+  
+  // Для popup авторизации добавляем state параметр
+  if (isPopup) {
+    authOptions.state = JSON.stringify({ popup: true, groupId: groupIdFromUrl });
+  }
+  
+  passport.authenticate('senler', authOptions)(req, res, next);
 });
 
 /**
- * Обработчик обратного вызова для Senler (обычный и popup)
+ * Обработчик OAuth callback
+ * Универсально обрабатывает как popup, так и обычную авторизацию
  */
-router.get(
-  '/senler/callback',
+router.get('/senler/callback', 
+  // Middleware для обработки ошибок OAuth
   (req: Request, res: Response, next: NextFunction): void => {
-    // Проверяем наличие ошибки в callback
     if (req.query.error) {
-      console.error('❌ Ошибка callback:', req.query.error);
+      console.error('❌ OAuth ошибка:', req.query.error);
       
-      // Проверяем, это popup авторизация или обычная
-      const state = req.query.state as string;
-      let isPopup = false;
-      
-      try {
-        if (state) {
-          const stateData = JSON.parse(state);
-          isPopup = stateData.popup === true;
-        }
-      } catch (e) {
-        // Игнорируем ошибку парсинга state
-      }
-      
-      if (isPopup) {
-        // Для popup возвращаем HTML с ошибкой
-        const errorHtml = generatePopupErrorHTML(
-          req.query.error as string,
-          req.query.error_description as string
-        );
-        res.send(errorHtml);
-        return;
-      } else {
-        // Для обычной авторизации редирект
-        res.redirect(`/?error=senler_error&details=${encodeURIComponent(req.query.error as string)}&description=${encodeURIComponent(req.query.error_description as string || 'Неизвестная ошибка')}`);
-        return;
-      }
+      const isPopup = isPopupAuth(req);
+      handleAuthError(
+        res, 
+        req.query.error as string, 
+        req.query.error_description as string,
+        isPopup
+      );
+      return;
     }
-    
     next();
   },
+  
+  // Passport аутентификация
   passport.authenticate('senler', {
-    failureRedirect: '/auth/senler/error',
+    failureRedirect: '/auth/error',
     session: false,
   }),
+  
+  // Обработка успешной авторизации
   (req: Request & { user?: any }, res: Response): void => {
     const user = req.user as SenlerChannel;
-    const accessToken = user?.accessToken;
-    let groupId = user?.groupId;
+    const { accessToken, groupId } = user || {};
+    const isPopup = isPopupAuth(req);
+    const requestedGroupId = getGroupIdFromState(req);
     
-    // Проверяем, это popup авторизация или обычная
-    const state = req.query.state as string;
-    let isPopup = false;
+    console.log('✅ OAuth успех:', { 
+      accessToken: !!accessToken, 
+      groupId, 
+      popup: isPopup,
+      requestedGroupId,
+      groupIdMatches: requestedGroupId ? requestedGroupId === groupId : 'not_requested'
+    });
     
-    try {
-      if (state) {
-        const stateData = JSON.parse(state);
-        isPopup = stateData.popup === true;
-      }
-    } catch (e) {
-      // Игнорируем ошибку парсинга state
-    }
-    
+    // Валидация полученных данных
     if (!accessToken) {
-      console.error('❌ Токен доступа не найден');
-      
-      if (isPopup) {
-        const errorHtml = generatePopupErrorHTML('no_token');
-        res.send(errorHtml);
-        return;
-      } else {
-        res.redirect('/?error=no_token');
-        return;
-      }
+      handleAuthError(res, 'no_token', 'Токен доступа не получен', isPopup);
+      return;
     }
     
     if (!groupId) {
-      console.error('❌ Group ID не найден');
-      
-      if (isPopup) {
-        const errorHtml = generatePopupErrorHTML('no_group_id');
-        res.send(errorHtml);
-        return;
-      } else {
-        res.redirect('/?error=no_group_id');
-        return;
-      }
+      handleAuthError(res, 'no_group_id', 'Group ID не получен', isPopup);
+      return;
     }
     
+    // Возврат результата в зависимости от типа авторизации
     if (isPopup) {
-      // Для popup возвращаем HTML с данными
+      // Для popup возвращаем HTML с результатом
       const successHtml = generatePopupSuccessHTML({
         accessToken,
         groupId,
+        requestedGroupId,
       });
       res.send(successHtml);
     } else {
-      // Для обычной авторизации редирект на главную
-      res.redirect('/');
+      // Для обычной авторизации редирект на главную страницу
+      // ВНИМАНИЕ: Redirect режим НЕ поддерживается в iframe интеграции
+      const params = new URLSearchParams({
+        success: 'true',
+        group_id: groupId,
+        ...(requestedGroupId && { requested_group_id: requestedGroupId })
+      });
+      res.redirect(`/?${params.toString()}`);
     }
   }
 );
 
 /**
- * Страница ошибки аутентификации с детальной информацией
+ * Общий обработчик ошибок авторизации
  */
-router.get('/senler/error', (req: Request, res: Response): void => {
-  const errorDetails = req.query.error_description || req.query.error || 'Неизвестная ошибка';
-  res.redirect(`/?error=auth_failed&details=${encodeURIComponent(errorDetails as string)}`);
-});
-
-/**
- * Начало процесса аутентификации через Senler в popup
- */
-router.get('/senler/popup', (req: Request, res: Response, next: NextFunction): void => {
-  const groupIdFromUrl = req.query.group_id as string;
-  console.log('🔍 /auth/senler/popup - group_id из URL:', groupIdFromUrl);
-  console.log('🔍 /auth/senler/popup - req.query:', req.query);
-  
-  // Передаем параметр для определения popup авторизации и group_id через опции
-  const stateData = { popup: true };
-  
-  passport.authenticate('senler', {
-    state: JSON.stringify(stateData),
-    group_id: groupIdFromUrl
-  } as any)(req, res, next);
-});
-
-/**
- * Endpoint для валидации данных авторизации (localStorage используется на клиенте)
- */
-router.post('/validate-auth', (req: Request, res: Response): void => {
-  const { accessToken, groupId } = req.body;
-  
-  if (!accessToken || !groupId) {
-    console.error('❌ Ошибка валидации: отсутствуют данные');
-    res.status(400).json({ 
-      error: 'Отсутствуют необходимые данные',
-      details: { accessToken: !!accessToken, groupId: !!groupId }
-    });
-    return;
-  }
-  
-  // Просто валидируем и возвращаем успех
-  // Данные сохраняются в localStorage на клиенте
-  res.json({ 
-    success: true, 
-    message: 'Данные авторизации валидны',
-    groupId: Number(groupId)
-  });
+router.get('/error', (req: Request, res: Response): void => {
+  const error = req.query.error || 'Неизвестная ошибка авторизации';
+  res.redirect(`/?error=auth_failed&details=${encodeURIComponent(error as string)}`);
 });
 
 /**
@@ -202,6 +219,14 @@ router.post('/subscribers', async (req: Request, res: Response): Promise<void> =
       details: error.response?.data || null
     });
   }
+});
+
+/**
+ * Опциональный endpoint для logout
+ */
+router.post('/logout', (_req: Request, res: Response): void => {
+  // В реальном приложении здесь нужно очистить сессию/токены
+  res.json({ success: true, message: 'Выход выполнен' });
 });
 
 export default router; 

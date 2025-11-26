@@ -18,7 +18,12 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
- * Генерация контента главной страницы с поддержкой localStorage
+ * Generate main page content with localStorage support and error handling
+ * @param error - Optional error code to display
+ * @param errorDetails - Optional detailed error information
+ * @param errorDescription - Optional error description
+ * @param groupIdFromUrl - Optional group ID passed via URL parameters
+ * @returns HTML content for the main page
  */
 function generateMainPage(error?: string, errorDetails?: string, errorDescription?: string, groupIdFromUrl?: string): string {
   let errorHtml = '';
@@ -87,6 +92,12 @@ function generateMainPage(error?: string, errorDetails?: string, errorDescriptio
     <!-- Секция неавторизованного пользователя -->
     <div id="unauthenticated" style="display: none;">
       <p style="margin-bottom: 20px;">Для доступа к статистике необходимо авторизоваться через Senler</p>
+      ${process.env.AUTH_MODE === 'redirect' ? `
+        <div class="warning" style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; color: #856404;">
+          <strong>⚠️ Внимание:</strong> Режим redirect не поддерживается в iframe интеграции.<br>
+          Для работы в iframe используйте AUTH_MODE=popup в .env файле.
+        </div>
+      ` : ''}
       ${errorHtml}
       <button id="authButton" class="btn" onclick="openAuthPopup()">🔐 Войти через Senler</button>
       <div class="debug-info">
@@ -94,8 +105,9 @@ function generateMainPage(error?: string, errorDetails?: string, errorDescriptio
         • Client ID: ${process.env.SENLER_CLIENT_ID ? '✅ Настроен' : '❌ Не настроен'}<br>
         • Client Secret: ${process.env.SENLER_CLIENT_SECRET ? '✅ Настроен' : '❌ Не настроен'}<br>
         • Callback URL: ${process.env.SENLER_CALLBACK_URL || `http://localhost:${process.env.PORT || 3000}/auth/senler/callback`}<br>
+        • Режим авторизации: ${process.env.AUTH_MODE || 'popup'} ${process.env.AUTH_MODE === 'redirect' ? '⚠️ (НЕ работает в iframe)' : '✅ (работает в iframe)'}<br>
         • Хранение: localStorage (работает в iframe)
-        ${groupIdFromUrl ? `<br>• Group ID из URL: ${groupIdFromUrl}` : ''}
+        ${groupIdFromUrl ? `<br>• Group ID из URL: <strong>${groupIdFromUrl}</strong> ✅` : '<br>• Group ID из URL: ❌ Не передан'}
       </div>
     </div>
 
@@ -112,7 +124,8 @@ function generateMainPage(error?: string, errorDetails?: string, errorDescriptio
         <strong>Полученные данные:</strong><br>
         • Токен доступа: <span id="tokenDisplay">***</span><br>
         • Group ID: <span id="groupIdText">--</span><br>
-        • Время авторизации: <span id="authTime">--</span>
+        • Время авторизации: <span id="authTime">--</span><br>
+        • Статус Group ID: <span id="groupIdStatus">--</span>
       </div>
 
       <h3 style="margin-top: 30px;">📊 Статистика подписчиков</h3>

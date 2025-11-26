@@ -2,7 +2,10 @@
 let authPopup = null;
 let checkInterval = null;
 
-// Функция для открытия popup авторизации
+/**
+ * Open popup window for Senler OAuth authorization
+ * Handles popup creation, positioning, and message communication
+ */
 function openAuthPopup() {
   const authButton = document.getElementById('authButton');
   if (authButton) {
@@ -21,7 +24,7 @@ function openAuthPopup() {
   const groupIdFromUrl = urlGroupIdMeta ? urlGroupIdMeta.getAttribute('content') : null;
   
   // Формируем URL с параметрами
-  let popupUrl = '/auth/senler/popup';
+  let popupUrl = '/auth/senler';
   if (groupIdFromUrl) {
     popupUrl += '?group_id=' + encodeURIComponent(groupIdFromUrl);
     console.log('📌 Передаем group_id в popup:', groupIdFromUrl);
@@ -41,7 +44,9 @@ function openAuthPopup() {
   window.addEventListener('message', handlePopupMessage, false);
 }
 
-// Проверка статуса popup окна
+/**
+ * Check if popup window is still open and clean up if closed
+ */
 function checkPopupStatus() {
   if (authPopup && authPopup.closed) {
     clearInterval(checkInterval);
@@ -50,7 +55,10 @@ function checkPopupStatus() {
   }
 }
 
-// Обработчик сообщений от popup окна
+/**
+ * Handle messages from popup window containing authorization data
+ * @param {MessageEvent} event - Message event from popup window
+ */
 function handlePopupMessage(event) {
   // Проверяем источник сообщения
   if (event.origin !== window.location.origin) {
@@ -71,6 +79,15 @@ function handlePopupMessage(event) {
   localStorage.setItem('senler_group_id', data.groupId);
   localStorage.setItem('senler_auth_time', Date.now().toString());
   
+  // Сохраняем дополнительную информацию о group_id
+  if (data.requestedGroupId) {
+    localStorage.setItem('senler_requested_group_id', data.requestedGroupId);
+    localStorage.setItem('senler_group_id_matches', data.groupIdMatches.toString());
+  } else {
+    localStorage.removeItem('senler_requested_group_id');
+    localStorage.removeItem('senler_group_id_matches');
+  }
+  
   // Закрываем popup и обновляем страницу
   if (authPopup) {
     authPopup.close();
@@ -78,7 +95,9 @@ function handlePopupMessage(event) {
   }
 }
 
-// Сброс состояния кнопки авторизации
+/**
+ * Reset authorization button to default state
+ */
 function resetAuthButton() {
   const authButton = document.getElementById('authButton');
   if (authButton) {

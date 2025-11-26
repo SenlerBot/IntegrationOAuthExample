@@ -2,8 +2,9 @@ import passport from 'passport';
 import { SenlerStrategy } from 'passport-senler';
 
 /**
- * Настройка Passport стратегии для Senler
- * Используем одну стратегию для обычной и popup авторизации
+ * Configure Passport strategy for Senler OAuth authentication
+ * Sets up a single strategy that handles both popup and redirect authorization
+ * @param PORT - Server port number used for callback URL generation
  */
 export const configurePassport = (PORT: number): void => {
   passport.use(

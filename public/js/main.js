@@ -12,7 +12,10 @@ document.addEventListener('DOMContentLoaded', function() {
   checkAuthStatus();
 });
 
-// Проверка статуса авторизации
+/**
+ * Check current authorization status and update UI accordingly
+ * Reads data from localStorage and displays appropriate interface
+ */
 function checkAuthStatus() {
   let accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
   let groupId = localStorage.getItem(STORAGE_KEYS.GROUP_ID);
@@ -39,7 +42,12 @@ function checkAuthStatus() {
   }
 }
 
-// Показать состояние авторизованного пользователя
+/**
+ * Display authenticated user interface with user data
+ * @param {string} accessToken - User's access token
+ * @param {string} groupId - User's group ID
+ * @param {string} authTime - Authentication timestamp
+ */
 function showAuthenticatedState(accessToken, groupId, authTime) {
   document.getElementById('unauthenticated').style.display = 'none';
   document.getElementById('authenticated').style.display = 'block';
@@ -49,15 +57,36 @@ function showAuthenticatedState(accessToken, groupId, authTime) {
   document.getElementById('tokenDisplay').textContent = accessToken.substring(0, 15) + '...';
   document.getElementById('authTime').textContent = authTime ? 
     new Date(authTime).toLocaleString('ru-RU') : 'Неизвестно';
+  
+  // Отображаем статус group_id
+  const requestedGroupId = localStorage.getItem('senler_requested_group_id');
+  const groupIdMatches = localStorage.getItem('senler_group_id_matches');
+  let statusText = '✅ Получен от Senler';
+  
+  if (requestedGroupId) {
+    if (groupIdMatches === 'true') {
+      statusText = '✅ Совпадает с запрошенным (' + requestedGroupId + ')';
+    } else if (groupIdMatches === 'false') {
+      statusText = '⚠️ НЕ совпадает с запрошенным (' + requestedGroupId + ')';
+    }
+  }
+  
+  document.getElementById('groupIdStatus').textContent = statusText;
 }
 
-// Показать состояние неавторизованного пользователя
+/**
+ * Display unauthenticated user interface
+ */
 function showUnauthenticatedState() {
   document.getElementById('authenticated').style.display = 'none';
   document.getElementById('unauthenticated').style.display = 'block';
 }
 
-// Загрузка данных подписчиков
+/**
+ * Load subscribers data from Senler API and display statistics
+ * @param {string} accessToken - User's access token
+ * @param {string} groupId - User's group ID
+ */
 async function loadSubscribersData(accessToken, groupId) {
   const loadingEl = document.getElementById('loadingStats');
   const statsEl = document.getElementById('statsContainer');
@@ -99,7 +128,10 @@ async function loadSubscribersData(accessToken, groupId) {
   }
 }
 
-// Отображение данных подписчиков
+/**
+ * Display subscribers statistics and table
+ * @param {Object} data - Subscribers data from API
+ */
 function displaySubscribersData(data) {
   const statsEl = document.getElementById('statsContainer');
   
@@ -131,7 +163,10 @@ function displaySubscribersData(data) {
   document.getElementById('statsError').style.display = 'none';
 }
 
-// Показать ошибку загрузки статистики
+/**
+ * Display error message when statistics loading fails
+ * @param {string} message - Error message to display
+ */
 function showStatsError(message) {
   const statsEl = document.getElementById('statsContainer');
   const errorEl = document.getElementById('statsError');
@@ -142,7 +177,11 @@ function showStatsError(message) {
   errorEl.style.display = 'block';
 }
 
-// Сохранение данных авторизации в localStorage
+/**
+ * Save authorization data to localStorage
+ * @param {string} accessToken - User's access token
+ * @param {string} groupId - User's group ID
+ */
 function saveAuthData(accessToken, groupId) {
   localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
   localStorage.setItem(STORAGE_KEYS.GROUP_ID, groupId);
@@ -151,11 +190,15 @@ function saveAuthData(accessToken, groupId) {
   console.log('✅ Данные авторизации сохранены в localStorage');
 }
 
-// Выход из системы
+/**
+ * Logout user by clearing all authorization data from localStorage
+ */
 function logout() {
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.GROUP_ID);
   localStorage.removeItem(STORAGE_KEYS.AUTH_TIME);
+  localStorage.removeItem('senler_requested_group_id');
+  localStorage.removeItem('senler_group_id_matches');
   
   console.log('🚪 Данные авторизации удалены из localStorage');
   window.location.reload();

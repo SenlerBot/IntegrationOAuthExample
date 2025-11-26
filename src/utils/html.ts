@@ -1,5 +1,8 @@
 /**
- * Генерация HTML страницы с подключением стилей и скриптов
+ * Generate complete HTML page with styles and scripts
+ * @param title - Page title for the HTML document
+ * @param content - HTML content to be inserted into the page body
+ * @returns Complete HTML document as string
  */
 export const generateHTML = (title: string, content: string): string => {
   return `<!DOCTYPE html>
@@ -23,10 +26,14 @@ export const generateHTML = (title: string, content: string): string => {
 interface PopupSuccessData {
   accessToken: string;
   groupId: string;
+  requestedGroupId?: string | null;
 }
 
 /**
- * Генерация страницы успешной авторизации в popup
+ * Generate success page HTML for popup authorization
+ * Creates a page that sends authorization data to parent window via postMessage
+ * @param data - Authorization data including access token, group ID, and requested group ID
+ * @returns HTML page that automatically sends data to parent window and shows success message
  */
 export const generatePopupSuccessHTML = (data: PopupSuccessData): string => {
   return `<!DOCTYPE html>
@@ -52,7 +59,9 @@ export const generatePopupSuccessHTML = (data: PopupSuccessData): string => {
     // Отправляем данные в родительское окно
     window.opener.postMessage({
       accessToken: "${data.accessToken}",
-      groupId: "${data.groupId}"
+      groupId: "${data.groupId}",
+      requestedGroupId: "${data.requestedGroupId || ''}",
+      groupIdMatches: ${data.requestedGroupId ? (data.requestedGroupId === data.groupId) : 'null'}
     }, window.location.origin);
   </script>
 </body>
@@ -60,7 +69,11 @@ export const generatePopupSuccessHTML = (data: PopupSuccessData): string => {
 };
 
 /**
- * Генерация страницы ошибки в popup
+ * Generate error page HTML for popup authorization
+ * Creates a page that displays error information and auto-closes after timeout
+ * @param error - Error code or type
+ * @param description - Optional detailed error description
+ * @returns HTML page that displays error and auto-closes popup window
  */
 export const generatePopupErrorHTML = (error: string, description?: string): string => {
   return `<!DOCTYPE html>
